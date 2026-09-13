@@ -35,7 +35,7 @@ public class HubEventMapper {
         };
 
         return HubEventAvro.newBuilder()
-                .setHub_id(event.getHubId())
+                .setHubId(event.getHubId())
                 .setTimestamp(event.getTimestamp())
                 .setPayload(payload)
                 .build();
@@ -44,7 +44,7 @@ public class HubEventMapper {
     private List<ScenarioConditionAvro> mapConditions(List<ScenarioCondition> conditions) {
         return conditions.stream()
                 .map(c -> ScenarioConditionAvro.newBuilder()
-                        .setSensor_id(c.getSensorId())
+                        .setSensorId(c.getSensorId())
                         .setType(ConditionTypeAvro.valueOf(c.getType().name()))
                         .setOperation(ConditionOperationAvro.valueOf(c.getOperation().name()))
                         .setValue(c.getValue())
@@ -55,7 +55,7 @@ public class HubEventMapper {
     private List<DeviceActionAvro> mapActions(List<DeviceAction> actions) {
         return actions.stream()
                 .map(a -> DeviceActionAvro.newBuilder()
-                        .setSensor_id(a.getSensorId())
+                        .setSensorId(a.getSensorId())
                         .setType(ActionTypeAvro.valueOf(a.getType().name()))
                         .setValue(a.getValue())
                         .build())

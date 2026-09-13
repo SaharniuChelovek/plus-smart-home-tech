@@ -10,18 +10,18 @@ public class SensorEventMapper {
     public SensorEventAvro mapToAvro(SensorEvent event) {
         Object payload = switch (event) {
             case ClimateSensorEvent e -> ClimateSensorAvro.newBuilder()
-                    .setTemperature_c(e.getTemperatureC())
+                    .setTemperatureC(e.getTemperatureC())
                     .setHumidity(e.getHumidity())
-                    .setCo2_level(e.getCo2Level())
+                    .setCo2Level(e.getCo2Level())
                     .build();
 
             case LightSensorEvent e -> LightSensorAvro.newBuilder()
-                    .setLink_quality(e.getLinkQuality())
+                    .setLinkQuality(e.getLinkQuality())
                     .setLuminosity(e.getLuminosity())
                     .build();
 
             case MotionSensorEvent e -> MotionSensorAvro.newBuilder()
-                    .setLink_quality(e.getLinkQuality())
+                    .setLinkQuality(e.getLinkQuality())
                     .setMotion(e.isMotion())
                     .setVoltage(e.getVoltage())
                     .build();
@@ -31,8 +31,8 @@ public class SensorEventMapper {
                     .build();
 
             case TemperatureSensorEvent e -> TemperatureSensorAvro.newBuilder()
-                    .setTemperature_c(e.getTemperatureC())
-                    .setTemperature_f(e.getTemperatureF())
+                    .setTemperatureC(e.getTemperatureC())
+                    .setTemperatureF(e.getTemperatureF())
                     .build();
 
             default -> throw new IllegalArgumentException(
@@ -41,7 +41,7 @@ public class SensorEventMapper {
 
         return SensorEventAvro.newBuilder()
                 .setId(event.getId())
-                .setHub_id(event.getHubId())
+                .setHubId(event.getHubId())
                 .setTimestamp(event.getTimestamp())
                 .setPayload(payload)
                 .build();

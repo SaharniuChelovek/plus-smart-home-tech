@@ -15,6 +15,6 @@ public class SensorEventService {
 
     public void collect(SensorEvent event) {
         var avroEvent = mapper.mapToAvro(event);
-        producer.sendSensorEvent(event.getHubId(), avroEvent);
+        producer.sendSensorEvent(event.getHubId(), event.getTimestamp(), avroEvent);
     }
 }

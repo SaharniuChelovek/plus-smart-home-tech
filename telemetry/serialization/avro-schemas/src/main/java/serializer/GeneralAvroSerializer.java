@@ -1,4 +1,4 @@
-package ru.yandex.practicum.collector.serializer;
+package serializer;
 
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;

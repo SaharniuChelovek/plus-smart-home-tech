@@ -15,6 +15,6 @@ public class HubEventService {
 
     public void collect(HubEvent event) {
         var avroEvent = mapper.mapToAvro(event);
-        producer.sendHubEvent(event.getHubId(), avroEvent);
+        producer.sendHubEvent(event.getHubId(), event.getTimestamp(), avroEvent);
     }
 }

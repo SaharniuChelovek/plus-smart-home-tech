@@ -2,13 +2,15 @@ syntax = "proto3";
 
 package telemetry.message.event;
 
+import "google/protobuf/timestamp.proto";
+
 option java_multiple_files = true;
 option java_package = "ru.yandex.practicum.grpc.telemetry.event";
 
 message SensorEventProto {
   string id = 1;
   google.protobuf.Timestamp timestamp = 2;
-  string hubId = 3;
+  string hub_id = 3;
   oneof payload {
     MotionSensorProto motion_sensor = 4;
     TemperatureSensorProto temperature_sensor = 5;
@@ -43,5 +45,3 @@ message ClimateSensorProto {
 message SwitchSensorProto {
   bool state = 1;
 }
-
-

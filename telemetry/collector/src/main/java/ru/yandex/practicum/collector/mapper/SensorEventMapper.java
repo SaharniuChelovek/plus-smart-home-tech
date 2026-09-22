@@ -1,49 +1,71 @@
 package ru.yandex.practicum.collector.mapper;
 
+import com.google.protobuf.Timestamp;
 import org.springframework.stereotype.Component;
-import ru.yandex.practicum.collector.model.sensor.*;
+import ru.yandex.practicum.grpc.telemetry.event.*;
 import ru.yandex.practicum.kafka.telemetry.event.*;
+
+import java.time.Instant;
 
 @Component
 public class SensorEventMapper {
 
-    public SensorEventAvro mapToAvro(SensorEvent event) {
-        Object payload = switch (event) {
-            case ClimateSensorEvent e -> ClimateSensorAvro.newBuilder()
-                    .setTemperatureC(e.getTemperatureC())
-                    .setHumidity(e.getHumidity())
-                    .setCo2Level(e.getCo2Level())
-                    .build();
-
-            case LightSensorEvent e -> LightSensorAvro.newBuilder()
-                    .setLinkQuality(e.getLinkQuality())
-                    .setLuminosity(e.getLuminosity())
-                    .build();
-
-            case MotionSensorEvent e -> MotionSensorAvro.newBuilder()
-                    .setLinkQuality(e.getLinkQuality())
-                    .setMotion(e.isMotion())
-                    .setVoltage(e.getVoltage())
-                    .build();
-
-            case SwitchSensorEvent e -> SwitchSensorAvro.newBuilder()
-                    .setState(e.isState())
-                    .build();
-
-            case TemperatureSensorEvent e -> TemperatureSensorAvro.newBuilder()
-                    .setTemperatureC(e.getTemperatureC())
-                    .setTemperatureF(e.getTemperatureF())
-                    .build();
-
-            default -> throw new IllegalArgumentException(
-                    "Неизвестный тип события датчика: " + event.getType());
+    public SensorEventAvro mapToAvro(SensorEventProto proto) {
+        Object payload = switch (proto.getPayloadCase()) {
+            case MOTION_SENSOR -> mapMotion(proto.getMotionSensor());
+            case TEMPERATURE_SENSOR -> mapTemperature(proto.getTemperatureSensor());
+            case LIGHT_SENSOR -> mapLight(proto.getLightSensor());
+            case CLIMATE_SENSOR -> mapClimate(proto.getClimateSensor());
+            case SWITCH_SENSOR -> mapSwitch(proto.getSwitchSensor());
+            case PAYLOAD_NOT_SET -> throw new IllegalArgumentException(
+                    "Не задан payload события датчика: " + proto.getId());
         };
 
         return SensorEventAvro.newBuilder()
-                .setId(event.getId())
-                .setHubId(event.getHubId())
-                .setTimestamp(event.getTimestamp())
+                .setId(proto.getId())
+                .setHubId(proto.getHubId())
+                .setTimestamp(toInstant(proto.getTimestamp()))
                 .setPayload(payload)
                 .build();
+    }
+
+    private ClimateSensorAvro mapClimate(ClimateSensorProto p) {
+        return ClimateSensorAvro.newBuilder()
+                .setTemperatureC(p.getTemperatureC())
+                .setHumidity(p.getHumidity())
+                .setCo2Level(p.getCo2Level())
+                .build();
+    }
+
+    private LightSensorAvro mapLight(LightSensorProto p) {
+        return LightSensorAvro.newBuilder()
+                .setLinkQuality(p.getLinkQuality())
+                .setLuminosity(p.getLuminosity())
+                .build();
+    }
+
+    private MotionSensorAvro mapMotion(MotionSensorProto p) {
+        return MotionSensorAvro.newBuilder()
+                .setLinkQuality(p.getLinkQuality())
+                .setMotion(p.getMotion())
+                .setVoltage(p.getVoltage())
+                .build();
+    }
+
+    private SwitchSensorAvro mapSwitch(SwitchSensorProto p) {
+        return SwitchSensorAvro.newBuilder()
+                .setState(p.getState())
+                .build();
+    }
+
+    private TemperatureSensorAvro mapTemperature(TemperatureSensorProto p) {
+        return TemperatureSensorAvro.newBuilder()
+                .setTemperatureC(p.getTemperatureC())
+                .setTemperatureF(p.getTemperatureF())
+                .build();
+    }
+
+    private Instant toInstant(Timestamp timestamp) {
+        return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
     }
 }

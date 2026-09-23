@@ -1,29 +1,57 @@
 package ru.yandex.practicum.collector.controller;
 
-import jakarta.validation.Valid;
+import com.google.protobuf.Empty;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
-import ru.yandex.practicum.collector.model.hub.HubEvent;
-import ru.yandex.practicum.collector.model.sensor.SensorEvent;
+import lombok.extern.slf4j.Slf4j;
+import net.devh.boot.grpc.server.service.GrpcService;
 import ru.yandex.practicum.collector.service.HubEventService;
 import ru.yandex.practicum.collector.service.SensorEventService;
+import ru.yandex.practicum.grpc.telemetry.event.CollectorControllerGrpc;
+import ru.yandex.practicum.grpc.telemetry.event.HubEventProto;
+import ru.yandex.practicum.grpc.telemetry.event.SensorEventProto;
 
-@RestController
+@Slf4j
+@GrpcService
 @RequiredArgsConstructor
-public class EventController {
+public class EventController extends CollectorControllerGrpc.CollectorControllerImplBase {
 
     private final SensorEventService sensorEventService;
     private final HubEventService hubEventService;
 
-    @PostMapping("/events/sensors")
-    public void collectSensorEvent(@Valid @RequestBody SensorEvent event) {
-        sensorEventService.collect(event);
+    @Override
+    public void collectSensorEvent(SensorEventProto request, StreamObserver<Empty> responseObserver) {
+        try {
+            sensorEventService.collect(request);
+
+            responseObserver.onNext(Empty.getDefaultInstance());
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("Ошибка обработки события датчика: {}", e.getMessage(), e);
+            responseObserver.onError(new StatusRuntimeException(
+                    Status.INTERNAL
+                            .withDescription(e.getLocalizedMessage())
+                            .withCause(e)
+            ));
+        }
     }
 
-    @PostMapping("/events/hubs")
-    public void collectHubEvent(@Valid @RequestBody HubEvent event) {
-        hubEventService.collect(event);
+    @Override
+    public void collectHubEvent(HubEventProto request, StreamObserver<Empty> responseObserver) {
+        try {
+            hubEventService.collect(request);
+
+            responseObserver.onNext(Empty.getDefaultInstance());
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("Ошибка обработки события хаба: {}", e.getMessage(), e);
+            responseObserver.onError(new StatusRuntimeException(
+                    Status.INTERNAL
+                            .withDescription(e.getLocalizedMessage())
+                            .withCause(e)
+            ));
+        }
     }
 }

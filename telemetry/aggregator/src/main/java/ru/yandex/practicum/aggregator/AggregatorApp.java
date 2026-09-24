@@ -1,13 +1,16 @@
-
+package ru.yandex.practicum.aggregator;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.r2dbc.R2dbcAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.ConfigurableApplicationContext;
-import ru.yandex.practicum.service.AggregationStarter;
+import ru.yandex.practicum.aggregator.service.AggregationStarter;
 
 @SpringBootApplication(exclude = {
-        org.springframework.boot.autoconfigure.r2dbc.R2dbcAutoConfiguration.class
+        DataSourceAutoConfiguration.class,
+        R2dbcAutoConfiguration.class
 })
 
 @ConfigurationPropertiesScan

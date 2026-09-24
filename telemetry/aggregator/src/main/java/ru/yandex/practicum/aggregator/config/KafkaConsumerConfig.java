@@ -1,4 +1,4 @@
-package ru.yandex.practicum.config;
+package ru.yandex.practicum.aggregator.config;
 
 import deserializer.SensorEventDeserializer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;

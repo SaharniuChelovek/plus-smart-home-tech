@@ -6,7 +6,10 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.ConfigurableApplicationContext;
 import ru.yandex.practicum.service.AggregationStarter;
 
-@SpringBootApplication
+@SpringBootApplication(exclude = {
+        org.springframework.boot.autoconfigure.r2dbc.R2dbcAutoConfiguration.class
+})
+
 @ConfigurationPropertiesScan
 public class AggregatorApp {
 

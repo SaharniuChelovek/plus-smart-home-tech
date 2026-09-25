@@ -43,9 +43,14 @@ public class AggregationStarter {
                         consumer.poll(Duration.ofMillis(1000));
 
                 for (ConsumerRecord<String, SensorEventAvro> record : records) {
-                    SensorEventAvro event = record.value();
-
-                    snapshotService.updateState(event).ifPresent(this::sendSnapshot);
+                    try {
+                        SensorEventAvro event = record.value();
+                        snapshotService.updateState(event).ifPresent(this::sendSnapshot);
+                    } catch (Exception e) {
+                        log.error("Ошибка обработки события из топика {}, partition {}, offset {}: {}",
+                                record.topic(), record.partition(), record.offset(), e.getMessage(), e);
+                        // не прерываем цикл — переходим к следующему record
+                    }
                 }
 
                 consumer.commitAsync();

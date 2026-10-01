@@ -7,7 +7,9 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
-
+  sql:
+    init:
+      mode: always
 grpc:
   client:
     hub-router:

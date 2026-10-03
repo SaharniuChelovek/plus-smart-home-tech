@@ -26,7 +26,7 @@ analyzer:
       snapshots: telemetry.snapshots.v1
     hub-consumer:
       group-id: analyzer-hub-events
-      enable-auto-commit: true
+      enable-auto-commit: false
       auto-offset-reset: earliest
       poll-timeout-ms: 1000
     snapshot-consumer:

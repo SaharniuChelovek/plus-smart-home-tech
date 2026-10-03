@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.yandex.practicum.analyzer.exception.UnknownSensorException;
 import ru.yandex.practicum.analyzer.model.Action;
 import ru.yandex.practicum.analyzer.model.ActionType;
 import ru.yandex.practicum.analyzer.model.Condition;
@@ -29,6 +30,7 @@ import ru.yandex.practicum.kafka.telemetry.event.ScenarioAddedEventAvro;
 import ru.yandex.practicum.kafka.telemetry.event.ScenarioConditionAvro;
 import ru.yandex.practicum.kafka.telemetry.event.ScenarioRemovedEventAvro;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -105,9 +107,11 @@ public class HubEventService {
                 .collect(Collectors.toMap(Sensor::getId, Function.identity()));
 
         if (!sensors.keySet().containsAll(sensorIds)) {
-            log.warn("Сценарий '{}' хаба {} ссылается на незарегистрированные устройства, событие пропущено",
-                    event.getName(), hubId);
-            return;
+            Set<String> missing = new HashSet<>(sensorIds);
+            missing.removeAll(sensors.keySet());
+            throw new UnknownSensorException(
+                    "Сценарий '%s' хаба %s ссылается на незарегистрированные устройства: %s"
+                            .formatted(event.getName(), hubId, missing));
         }
 
         Scenario scenario = new Scenario();
@@ -115,19 +119,29 @@ public class HubEventService {
         scenario.setName(event.getName());
         scenario = scenarioRepository.save(scenario);
 
-        for (ScenarioConditionAvro c : event.getConditions()) {
-            Condition condition = conditionRepository.save(toCondition(c));
-            Sensor sensor = sensors.get(c.getSensorId());
+        List<Condition> conditions = conditionRepository.saveAll(
+                event.getConditions().stream().map(this::toCondition).toList());
+        List<Action> actions = actionRepository.saveAll(
+                event.getActions().stream().map(this::toAction).toList());
+
+        List<ScenarioCondition> conditionLinks = new ArrayList<>();
+        for (int i = 0; i < conditions.size(); i++) {
+            Condition condition = conditions.get(i);
+            Sensor sensor = sensors.get(event.getConditions().get(i).getSensorId());
             ScenarioConditionId id = new ScenarioConditionId(scenario.getId(), sensor.getId(), condition.getId());
-            scenarioConditionRepository.save(new ScenarioCondition(id, scenario, sensor, condition));
+            conditionLinks.add(new ScenarioCondition(id, scenario, sensor, condition));
         }
 
-        for (DeviceActionAvro a : event.getActions()) {
-            Action action = actionRepository.save(toAction(a));
-            Sensor sensor = sensors.get(a.getSensorId());
+        List<ScenarioAction> actionLinks = new ArrayList<>();
+        for (int i = 0; i < actions.size(); i++) {
+            Action action = actions.get(i);
+            Sensor sensor = sensors.get(event.getActions().get(i).getSensorId());
             ScenarioActionId id = new ScenarioActionId(scenario.getId(), sensor.getId(), action.getId());
-            scenarioActionRepository.save(new ScenarioAction(id, scenario, sensor, action));
+            actionLinks.add(new ScenarioAction(id, scenario, sensor, action));
         }
+
+        scenarioConditionRepository.saveAll(conditionLinks);
+        scenarioActionRepository.saveAll(actionLinks);
     }
 
     private void removeScenario(String hubId, ScenarioRemovedEventAvro event) {

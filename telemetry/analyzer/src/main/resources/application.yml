@@ -1,36 +1,5 @@
 spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/telemetry_analyzer
-    username: dbuser
-    password: 12345
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
-  sql:
-    init:
-      mode: always
-grpc:
-  client:
-    hub-router:
-      address: 'static://localhost:59090'
-      enableKeepAlive: true
-      keepAliveWithoutCalls: true
-      negotiationType: plaintext
-
-analyzer:
-  kafka:
-    bootstrap-servers: localhost:9092
-    topics:
-      hubs: telemetry.hubs.v1
-      snapshots: telemetry.snapshots.v1
-    hub-consumer:
-      group-id: analyzer-hub-events
-      enable-auto-commit: false
-      auto-offset-reset: earliest
-      poll-timeout-ms: 1000
-    snapshot-consumer:
-      group-id: analyzer-snapshots
-      enable-auto-commit: false
-      auto-offset-reset: latest
-      poll-timeout-ms: 1000
+  application:
+    name: analyzer
+  config:
+    import: "configserver:http://localhost:8888"

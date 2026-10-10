@@ -1,0 +1,14 @@
+kafka:
+  consumer:
+    group-id: aggregator
+    key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    value-deserializer: deserializer.SensorEventDeserializer
+    enable-auto-commit: false
+  topics:
+    sensors: telemetry.sensors.v1
+    snapshots: telemetry.snapshots.v1
+
+aggregator:
+  kafka:
+    consumer:
+      poll-timeout: 100ms

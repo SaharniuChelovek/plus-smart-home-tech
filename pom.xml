@@ -22,6 +22,7 @@
         <module>telemetry/aggregator</module>
         <module>telemetry/analyzer</module>
         <module>infra/config-server</module>
+        <module>infra/discovery-server</module>
     </modules>
 
     <properties>

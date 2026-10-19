@@ -1,6 +1,7 @@
 package ru.yandex.practicum.order.mapper;
 
 import org.springframework.stereotype.Component;
+import ru.yandex.practicum.order.client.ProductResponse;
 import ru.yandex.practicum.order.dto.CreateOrderRequest;
 import ru.yandex.practicum.order.dto.OrderDto;
 import ru.yandex.practicum.order.dto.OrderItemDto;
@@ -11,29 +12,31 @@ import ru.yandex.practicum.order.entity.OrderStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class OrderMapper {
 
-    public Order toEntity(CreateOrderRequest request) {
+    public Order toEntity(CreateOrderRequest request, Map<Long, ProductResponse> products) {
         Order order = Order.builder()
                 .customerName(request.customerName())
                 .customerEmail(request.customerEmail())
-                .status(OrderStatus.CREATED)
+                .status(OrderStatus.CONFIRMED)
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        request.items().forEach(item -> order.addItem(toEntity(item)));
+        request.items().forEach(item ->
+                order.addItem(toEntity(item, products.get(item.productId()))));
 
         return order;
     }
 
-    public OrderItem toEntity(OrderItemRequest request) {
+    public OrderItem toEntity(OrderItemRequest request, ProductResponse product) {
         return OrderItem.builder()
-                .productId(request.productId())
-                .productName(request.productName())
+                .productId(product.id())
+                .productName(product.name())
                 .quantity(request.quantity())
-                .price(request.price())
+                .price(product.price())
                 .build();
     }
 

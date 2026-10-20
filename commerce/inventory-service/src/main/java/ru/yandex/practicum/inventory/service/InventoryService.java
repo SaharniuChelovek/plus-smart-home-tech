@@ -75,4 +75,18 @@ public class InventoryService {
                 .orElseThrow(() -> new NotFoundException(
                         "Складская запись для товара с id=" + productId + " не найдена"));
     }
+
+    @Transactional
+    public ReserveResponse release(ReserveRequest request) {
+        InventoryItem item = getOrThrow(request.productId());
+        int reserved = item.getReservedQuantity();
+        if (request.quantity() > reserved) {
+            throw new IllegalArgumentException(
+                    "Нельзя снять резерв для товара с id=" + request.productId()
+                            + ": запрошено " + request.quantity() + ", зарезервировано " + reserved);
+        }
+        item.setReservedQuantity(reserved - request.quantity());
+        InventoryItem saved = repository.save(item);
+        return mapper.toReserveResponse(saved, "Резерв успешно снят");
+    }
 }

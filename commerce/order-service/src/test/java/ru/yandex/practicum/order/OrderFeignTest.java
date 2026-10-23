@@ -12,7 +12,9 @@ import ru.yandex.practicum.order.dto.OrderItemRequest;
 import ru.yandex.practicum.order.entity.Order;
 import ru.yandex.practicum.order.entity.OrderItem;
 import ru.yandex.practicum.order.entity.OrderStatus;
+import ru.yandex.practicum.order.exception.InventoryServiceUnavailableException;
 import ru.yandex.practicum.order.exception.OrderProcessingException;
+import ru.yandex.practicum.order.exception.ProductServiceUnavailableException;
 import ru.yandex.practicum.order.mapper.OrderMapper;
 import ru.yandex.practicum.order.repository.OrderRepository;
 import ru.yandex.practicum.order.service.OrderPersistenceService;
@@ -206,7 +208,7 @@ class OrderFeignTest {
         when(inventoryClient.release(new ReserveRequest(2L, 1))).thenThrow(feignError(500));
 
         assertThatThrownBy(() -> orderService.createOrder(request(item(1L, 1), item(2L, 1))))
-                .hasMessage("db down"); // не затёрто ошибкой компенсации
+                .hasMessage("db down");
 
         verify(inventoryClient).release(new ReserveRequest(1L, 1));
     }
@@ -237,5 +239,62 @@ class OrderFeignTest {
                 .headers(Map.of())
                 .build();
         return FeignException.errorStatus("test", response);
+    }
+
+    @Test
+    void createOrder_productServiceUnavailable_savesPendingOrderWithPlaceholder() {
+        when(productClient.getById(1L))
+                .thenThrow(new ProductServiceUnavailableException(1L, new RuntimeException("timeout")));
+        when(inventoryClient.reserve(new ReserveRequest(1L, 2))).thenReturn(okResponse());
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderDto result = orderService.createOrder(request(item(1L, 2)));
+
+        Order saved = savedOrder();
+        assertThat(saved.getStatus()).isEqualTo(OrderStatus.PENDING_CONFIRMATION);
+        OrderItem savedItem = saved.getItems().get(0);
+        assertThat(savedItem.getProductId()).isEqualTo(1L);
+        assertThat(savedItem.getProductName()).isEqualTo("Товар #1 (ожидает проверки)");
+        assertThat(savedItem.getPrice()).isEqualByComparingTo("0");
+        assertThat(result.status()).isEqualTo("PENDING_CONFIRMATION");
+        assertThat(result.statusDetails()).contains("ручной проверки");
+        verify(inventoryClient).reserve(new ReserveRequest(1L, 2));
+    }
+
+    @Test
+    void createOrder_inventoryServiceUnavailable_savesPendingOrderWithProductSnapshot() {
+        when(productClient.getById(1L)).thenReturn(product(1L, "Ноутбук", "100.00", true));
+        when(inventoryClient.reserve(any()))
+                .thenThrow(new InventoryServiceUnavailableException(1L, new RuntimeException("timeout")));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderService.createOrder(request(item(1L, 2)));
+
+        Order saved = savedOrder();
+        assertThat(saved.getStatus()).isEqualTo(OrderStatus.PENDING_CONFIRMATION);
+        assertThat(saved.getItems().get(0).getProductName()).isEqualTo("Ноутбук");
+        assertThat(saved.getTotalPrice()).isEqualByComparingTo("200.00");
+        verify(inventoryClient, never()).release(any()); // ничего не было зарезервировано
+    }
+
+    @Test
+    void createOrder_inventoryUnavailableOnSecondItem_releasesFirstReserveAndSavesPending() {
+        when(productClient.getById(1L)).thenReturn(product(1L, "Ноутбук", "100.00", true));
+        when(productClient.getById(2L)).thenReturn(product(2L, "Мышь", "10.00", true));
+        when(inventoryClient.reserve(new ReserveRequest(1L, 1))).thenReturn(okResponse());
+        when(inventoryClient.reserve(new ReserveRequest(2L, 1)))
+                .thenThrow(new InventoryServiceUnavailableException(2L, new RuntimeException("down")));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderService.createOrder(request(item(1L, 1), item(2L, 1)));
+
+        verify(inventoryClient).release(new ReserveRequest(1L, 1));
+        assertThat(savedOrder().getStatus()).isEqualTo(OrderStatus.PENDING_CONFIRMATION);
+    }
+
+    private Order savedOrder() {
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        return captor.getValue();
     }
 }

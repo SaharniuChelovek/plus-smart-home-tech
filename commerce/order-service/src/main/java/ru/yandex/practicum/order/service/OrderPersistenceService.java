@@ -7,6 +7,7 @@ import ru.yandex.practicum.order.client.ProductResponse;
 import ru.yandex.practicum.order.dto.CreateOrderRequest;
 import ru.yandex.practicum.order.dto.OrderDto;
 import ru.yandex.practicum.order.entity.Order;
+import ru.yandex.practicum.order.entity.OrderStatus;
 import ru.yandex.practicum.order.mapper.OrderMapper;
 import ru.yandex.practicum.order.repository.OrderRepository;
 
@@ -21,8 +22,8 @@ public class OrderPersistenceService {
     private final OrderMapper orderMapper;
 
     @Transactional
-    public OrderDto save(CreateOrderRequest request, Map<Long, ProductResponse> products) {
-        Order order = orderMapper.toEntity(request, products);
+    public OrderDto save(CreateOrderRequest request, Map<Long, ProductResponse> products, OrderStatus status) {
+        Order order = orderMapper.toEntity(request, products, status);
         order.setTotalPrice(order.getItems().stream()
                 .map(i -> i.getPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add));

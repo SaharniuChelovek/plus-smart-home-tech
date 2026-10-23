@@ -10,6 +10,7 @@ import ru.yandex.practicum.order.entity.Order;
 import ru.yandex.practicum.order.entity.OrderItem;
 import ru.yandex.practicum.order.entity.OrderStatus;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -17,21 +18,29 @@ import java.util.Map;
 @Component
 public class OrderMapper {
 
-    public Order toEntity(CreateOrderRequest request, Map<Long, ProductResponse> products) {
+    public Order toEntity(CreateOrderRequest request, Map<Long, ProductResponse> products, OrderStatus status) {
         Order order = Order.builder()
                 .customerName(request.customerName())
                 .customerEmail(request.customerEmail())
-                .status(OrderStatus.CONFIRMED)
+                .status(status)
                 .createdAt(LocalDateTime.now())
                 .build();
 
         request.items().forEach(item ->
                 order.addItem(toEntity(item, products.get(item.productId()))));
-
         return order;
     }
 
     public OrderItem toEntity(OrderItemRequest request, ProductResponse product) {
+        if (product == null) {
+            // каталог был недоступен: сохраняем то, что известно
+            return OrderItem.builder()
+                    .productId(request.productId())
+                    .productName("Товар #" + request.productId() + " (ожидает проверки)")
+                    .quantity(request.quantity())
+                    .price(BigDecimal.ZERO)
+                    .build();
+        }
         return OrderItem.builder()
                 .productId(product.id())
                 .productName(product.name())
@@ -51,7 +60,7 @@ public class OrderMapper {
                 order.getCustomerEmail(),
                 order.getStatus().name(),
                 order.getTotalPrice(),
-                null,
+                statusDetails(order.getStatus()),
                 order.getCreatedAt(),
                 items);
     }
@@ -63,5 +72,11 @@ public class OrderMapper {
                 item.getProductName(),
                 item.getQuantity(),
                 item.getPrice());
+    }
+
+    private String statusDetails(OrderStatus status) {
+        return status == OrderStatus.PENDING_CONFIRMATION
+                ? "Заказ принят, но требует ручной проверки: данные о товарах или резервирование на складе не подтверждены"
+                : null;
     }
 }

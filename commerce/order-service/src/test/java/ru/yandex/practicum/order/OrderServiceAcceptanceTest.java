@@ -30,10 +30,10 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -46,8 +46,6 @@ class OrderServiceAcceptanceTest {
     @Autowired
     private ObjectMapper json;
 
-    // Spring Boot 3.4+: @MockitoBean (org.springframework.test.context.bean.override.mockito.MockitoBean)
-    // Spring Boot до 3.4: @MockBean (org.springframework.boot.test.mock.mockito.MockBean)
     @MockBean
     private ProductClient productClient;
 
@@ -175,4 +173,5 @@ class OrderServiceAcceptanceTest {
     private static BigDecimal asDecimal(Object value) {
         return new BigDecimal(value.toString());
     }
+
 }

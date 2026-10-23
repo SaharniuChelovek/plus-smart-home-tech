@@ -9,12 +9,17 @@ import ru.yandex.practicum.order.client.InventoryClient;
 import ru.yandex.practicum.order.client.ProductClient;
 import ru.yandex.practicum.order.client.ProductResponse;
 import ru.yandex.practicum.order.client.ReserveRequest;
+import ru.yandex.practicum.order.client.ReserveResponse;
+import ru.yandex.practicum.order.client.ServiceCallResult;
 import ru.yandex.practicum.order.dto.CreateOrderRequest;
 import ru.yandex.practicum.order.dto.OrderDto;
 import ru.yandex.practicum.order.dto.OrderItemRequest;
 import ru.yandex.practicum.order.entity.OrderItem;
+import ru.yandex.practicum.order.entity.OrderStatus;
+import ru.yandex.practicum.order.exception.InventoryServiceUnavailableException;
 import ru.yandex.practicum.order.exception.NotFoundException;
 import ru.yandex.practicum.order.exception.OrderProcessingException;
+import ru.yandex.practicum.order.exception.ProductServiceUnavailableException;
 import ru.yandex.practicum.order.mapper.OrderMapper;
 import ru.yandex.practicum.order.repository.OrderRepository;
 
@@ -36,32 +41,113 @@ public class OrderService {
     private final InventoryClient inventoryClient;
     private final OrderPersistenceService persistenceService;
 
+    // БЕЗ @Transactional: внутри удалённые вызовы
     public OrderDto createOrder(CreateOrderRequest request) {
+        // 1. Каталог: один вызов на уникальный productId
         Map<Long, ProductResponse> products = new LinkedHashMap<>();
-        request.items().stream()
-                .map(OrderItemRequest::productId)
-                .distinct()
-                .forEach(id -> products.put(id, loadActiveProduct(id)));
+        boolean catalogDegraded = false;
+        for (Long productId : uniqueProductIds(request)) {
+            ServiceCallResult<ProductResponse> result = loadProduct(productId);
+            if (result.isFailure()) {
+                throw new OrderProcessingException(result.message());
+            }
+            if (result.isDegraded()) {
+                catalogDegraded = true;
+                break; // каталог недоступен: остальные товары не запрашиваем
+            }
+            products.put(productId, result.value());
+        }
 
+        // 2. Суммарное количество по productId
         Map<Long, Integer> totals = request.items().stream()
                 .collect(Collectors.groupingBy(
                         OrderItemRequest::productId,
                         LinkedHashMap::new,
                         Collectors.summingInt(OrderItemRequest::quantity)));
 
+        // 3. Резервирование
         List<ReserveRequest> reserved = new ArrayList<>();
         try {
+            boolean inventoryDegraded = false;
             for (Map.Entry<Long, Integer> e : totals.entrySet()) {
                 ReserveRequest r = new ReserveRequest(e.getKey(), e.getValue());
-                reserve(r);
+                ServiceCallResult<ReserveResponse> result = reserve(r);
+                if (result.isFailure()) {
+                    throw new OrderProcessingException(result.message());
+                }
+                if (result.isDegraded()) {
+                    inventoryDegraded = true;
+                    break; // склад недоступен: остальные позиции не резервируем
+                }
                 reserved.add(r);
             }
-            return persistenceService.save(request, products);
+
+            if (inventoryDegraded) {
+                // не оставляем заказ с частичным резервом
+                compensate(reserved);
+                reserved.clear();
+            }
+
+            // 4. Статус и сохранение (короткая транзакция в отдельном бине)
+            boolean degraded = catalogDegraded || inventoryDegraded;
+            if (degraded) {
+                log.warn("Заказ уходит на ручную проверку: каталогНедоступен={}, складНедоступен={}",
+                        catalogDegraded, inventoryDegraded);
+            }
+            OrderStatus status = degraded ? OrderStatus.PENDING_CONFIRMATION : OrderStatus.CONFIRMED;
+            return persistenceService.save(request, products, status);
         } catch (RuntimeException e) {
             compensate(reserved);
             throw e;
         }
     }
+
+    private List<Long> uniqueProductIds(CreateOrderRequest request) {
+        return request.items().stream().map(OrderItemRequest::productId).distinct().toList();
+    }
+
+    private ServiceCallResult<ProductResponse> loadProduct(Long id) {
+        ProductResponse product;
+        try {
+            product = productClient.getById(id);
+        } catch (ProductServiceUnavailableException e) {
+            return ServiceCallResult.degraded("product-service недоступен");
+        } catch (FeignException.NotFound e) {
+            return ServiceCallResult.failure("Товар с id=" + id + " не найден");
+        } catch (FeignException e) {
+            log.error("product-service вернул ошибку: productId={}, status={}", id, e.status());
+            return ServiceCallResult.failure("Не удалось получить данные товара с id=" + id);
+        }
+        if (product == null) {
+            return ServiceCallResult.failure("Не удалось получить данные товара с id=" + id);
+        }
+        if (!Boolean.TRUE.equals(product.active())) {
+            return ServiceCallResult.failure("Товар с id=" + id + " снят с продажи");
+        }
+        if (product.price() == null) {
+            return ServiceCallResult.failure("Не удалось определить цену товара с id=" + id);
+        }
+        return ServiceCallResult.success(product);
+    }
+
+    private ServiceCallResult<ReserveResponse> reserve(ReserveRequest r) {
+        try {
+            return ServiceCallResult.success(inventoryClient.reserve(r));
+        } catch (InventoryServiceUnavailableException e) {
+            return ServiceCallResult.degraded("inventory-service недоступен");
+        } catch (FeignException.NotFound e) {
+            return ServiceCallResult.failure(
+                    "Складская запись для товара с id=" + r.productId() + " не найдена");
+        } catch (FeignException.Conflict e) {
+            return ServiceCallResult.failure(
+                    "Недостаточно товара с id=" + r.productId() + " на складе");
+        } catch (FeignException e) {
+            log.error("inventory-service вернул ошибку: productId={}, status={}", r.productId(), e.status());
+            return ServiceCallResult.failure("Не удалось зарезервировать товар с id=" + r.productId());
+        }
+    }
+
+
 
     private ProductResponse loadActiveProduct(Long id) {
         ProductResponse product;
@@ -80,22 +166,6 @@ public class OrderService {
             throw new OrderProcessingException("Не удалось определить цену товара с id=" + id);
         }
         return product;
-    }
-
-    private void reserve(ReserveRequest r) {
-        try {
-            inventoryClient.reserve(r);
-        } catch (FeignException.NotFound e) {
-            throw new OrderProcessingException(
-                    "Складская запись для товара с id=" + r.productId() + " не найдена");
-        } catch (FeignException.Conflict e) {
-            throw new OrderProcessingException(
-                    "Недостаточно товара с id=" + r.productId() + " на складе");
-        } catch (FeignException e) {
-            log.error("inventory-service error: productId={}, status={}", r.productId(), e.status(), e);
-            throw new OrderProcessingException(
-                    "Не удалось зарезервировать товар с id=" + r.productId());
-        }
     }
 
     private void compensate(List<ReserveRequest> reserved) {

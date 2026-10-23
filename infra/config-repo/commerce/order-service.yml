@@ -4,6 +4,8 @@ server:
 spring:
   cloud:
     openfeign:
+      circuitbreaker:
+        enabled: true
       client:
         config:
           default:

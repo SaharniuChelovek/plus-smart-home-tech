@@ -23,6 +23,7 @@
         <module>telemetry/analyzer</module>
         <module>infra/config-server</module>
         <module>infra/discovery-server</module>
+        <module>infra/api-gateway</module>
     </modules>
 
     <properties>

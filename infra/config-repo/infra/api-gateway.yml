@@ -89,7 +89,3 @@ spring:
             exposed-headers: [Location]
             allow-credentials: true
             max-age: 3600
-logging:
-  level:
-    org.springframework.cloud.gateway: DEBUG
-    org.springframework.cloud.loadbalancer: DEBUG

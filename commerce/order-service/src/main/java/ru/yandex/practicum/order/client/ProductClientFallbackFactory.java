@@ -19,7 +19,7 @@ public class ProductClientFallbackFactory implements FallbackFactory<ProductClie
             public ProductResponse getById(Long id) {
                 Optional<FeignException> business = ClientFailures.businessError(cause);
                 if (business.isPresent()) {
-                    throw business.get(); // 404 и прочее: не маскируем
+                    throw business.get();
                 }
                 log.warn("product-service недоступен: операция=getById, productId={}, причина={}",
                         id, ClientFailures.describe(cause));

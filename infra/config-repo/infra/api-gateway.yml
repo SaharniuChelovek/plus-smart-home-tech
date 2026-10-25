@@ -6,10 +6,10 @@ spring:
     gateway:
       discovery:
         locator:
-          enabled: false
+          enabled: false   # не публиковать все сервисы из Eureka автоматически
 
       routes:
-
+        # ---- READ-маршруты (GET + Retry), сначала более конкретные ----
         - id: product-service-read
           uri: lb://product-service
           predicates:
@@ -55,7 +55,7 @@ spring:
                   firstBackoff: 100ms
                   maxBackoff: 500ms
 
-
+        # ---- Общие маршруты (все методы, БЕЗ Retry) ----
         - id: product-service-products
           uri: lb://product-service
           predicates:
@@ -89,3 +89,7 @@ spring:
             exposed-headers: [Location]
             allow-credentials: true
             max-age: 3600
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.cloud.loadbalancer: DEBUG

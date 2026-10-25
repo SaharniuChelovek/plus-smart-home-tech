@@ -3,6 +3,12 @@ server:
 
 spring:
   cloud:
+    loadbalancer:
+      retry:
+        enabled: true
+        max-retries-on-same-service-instance: 0
+        max-retries-on-next-service-instance: 1
+        retry-on-all-operations: false
     openfeign:
       circuitbreaker:
         enabled: true

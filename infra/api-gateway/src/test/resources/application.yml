@@ -1,0 +1,26 @@
+spring:
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: false
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origins: [http://localhost:3000]
+            allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+            allowed-headers: ['*']
+            allow-credentials: true
+eureka:
+  client:
+    enabled: false
+gateway:
+  security:
+    allowed-origins: [http://localhost:3000]
+    users:
+      - { username: ivan, password: "{noop}ivan", roles: [USER] }
+      - { username: anna, password: "{noop}anna", roles: [USER, ADMIN] }
+
+logging.level.org.springframework.web: DEBUG
+logging.level.org.springframework.security: DEBUG
